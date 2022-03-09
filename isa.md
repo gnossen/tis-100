@@ -13,7 +13,7 @@ The following may all be used as either the source or destination of a `mov`
 instruction:
 
 |Name|Code|
-----------
+|----|----|
 |`ACC`|`000`|
 |`NIL`|`001`|
 |`LEFT`|`010`|
@@ -29,7 +29,7 @@ Instructions are divided into 4 different classes based on their arities and the
 types of the arguments, each of which is represented by a 3 bit prefix.
 
 |Class Number|Description|Prefix|
---------
+|------------|-----------|------|
 |0|Move from register to register|`000`|
 |1|Move from constant to register|`001`|
 |2|Nullary Instructions|`010`|
@@ -77,7 +77,7 @@ are left unused and their contents are ignored by the machine.
 A 3 bit specifier is used to distinguish between the 3 nullary instructions in class 2:
 
 |Instruction|Code|
------------------
+|-----------|----|
 |`SWP`|000|
 |`SAV`|001|
 |`NEG`|010|
@@ -108,14 +108,14 @@ instructions and arithmetic instructions. An additional 1-bit specifier is
 defined for these two types:
 
 |Type|Specifier|
----------------
+|----|---------|
 |Conditional|0|
 |Arithmetic|1|
 
 Then a 3-bit specifier within each subclass defines the specific instruction:
 
 |Type|Specifier|
----------------
+|----|---------|
 |`JMP`|`000`|
 |`JNZ`|`001`|
 |`JGZ`|`010`|
@@ -124,7 +124,7 @@ Then a 3-bit specifier within each subclass defines the specific instruction:
 |`JRO`|`100`|
 
 |Type|Specifier|
----------------
+|----|---------|
 |`ADD`|`000`|
 |`SUB`|`001`|
 
