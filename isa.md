@@ -41,8 +41,8 @@ types of the arguments, each of which is represented by a 3 bit prefix.
 Format:
 
 ```
-000     XXX 00      XXX 00000
-class   src unused  dst unused
+000     XXX 00       00000  XXX
+class   dst unused   unused src
 ```
 
 The 3 bit source and destination IDs follow the register/port/pseudoport list
@@ -52,12 +52,12 @@ Examples:
 
 ```
 MOV ACC, NIL
-000 000 00    001 00000
+000 001 00  00000000
 ```
 
 ```
 MOV LEFT, RIGHT
-000 010 00    011 00000
+000 011 00   00000 010 
 ```
 
 ### Class 1 Instructions
@@ -117,11 +117,11 @@ Then a 3-bit specifier within each subclass defines the specific instruction:
 |Type|Specifier|
 |----|---------|
 |`JMP`|`000`|
-|`JNZ`|`001`|
-|`JGZ`|`010`|
-|`JLZ`|`011`|
-|`JLZ`|`011`|
-|`JRO`|`100`|
+|`JEZ`|`001`|
+|`JNZ`|`010`|
+|`JGZ`|`011`|
+|`JLZ`|`100`|
+|`JRO`|`101`|
 
 |Type|Specifier|
 |----|---------|
@@ -139,7 +139,7 @@ Examples:
 
 ```
 JNZ 3
-01100010 00000011
+01100100 00000011
 ```
 
 ```
@@ -163,7 +163,7 @@ Examples:
 
 ```
 JGZ RIGHT
-10000100 00000011
+10000110 00000011
 ```
 
 ```

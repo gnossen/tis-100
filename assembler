@@ -1,0 +1,180 @@
+#!/usr/bin/env python
+
+import sys
+
+from typing import List, Union
+
+Instruction = List[str]
+
+_REGISTERS = (
+        "ACC",
+        "NIL",
+        "LEFT",
+        "RIGHT",
+        "UP",
+        "DOWN",
+        "ANY",
+        "LAST",
+)
+
+_CLASS2_INSTRUCTIONS = (
+    "SWP",
+    "SAV",
+    "NEG",
+)
+
+_COND_INSTRUCTIONS = (
+    "JMP",
+    "JEZ",
+    "JNZ",
+    "JGZ",
+    "JLZ",
+    "JRO",
+)
+
+_CALC_INSTRUCTIONS = (
+    "ADD",
+    "SUB",
+)
+
+_CLASS0_PREFIX = 0 << 5
+_CLASS1_PREFIX = 1 << 5
+_CLASS2_PREFIX = 2 << 5
+_CLASS3_PREFIX = 3 << 5
+_CLASS4_PREFIX = 4 << 5
+
+_COND_MASK = 0 << 4
+_CALC_MASK = 1 << 4
+
+
+def _process_mov(instruction: Instruction) -> List[int]:
+    if len(instruction) < 3:
+        sys.stderr.write("Too few arguments: {}\n".format(" ".join(instruction)))
+        sys.exit(1)
+    if len(instruction) > 3:
+        sys.stderr.write("Too many arguments: {}\n".format(" ".join(instruction)))
+        sys.exit(1)
+    instruction_bytes = [0, 0]
+    if instruction[1].isdigit():
+        # Immediate mode.
+        instruction_bytes[0] |= _CLASS1_PREFIX
+        constant = int(instruction[1])
+        if constant > 255:
+            sys.stderr.write("{} is too large a constant.".format(constant))
+            sys.exit(1)
+        instruction_bytes[1] = constant
+    elif instruction[1] in _REGISTERS:
+        # Register -> Register Mode.
+        instruction_bytes[0] |= _CLASS0_PREFIX
+        instruction_bytes[1] |= _REGISTERS.index(instruction[1])
+    else:
+        sys.stderr.write("Unkown source argument {}\n".format(instruction[1]))
+        sys.exit(1)
+
+    if instruction[2] not in _REGISTERS:
+        sys.stderr.write("Unkown destination argument {}\n".format(instruction[2]))
+        sys.exit(1)
+
+    instruction_bytes[0] |= (_REGISTERS.index(instruction[2]) << 2)
+    return instruction_bytes
+
+
+def _process_class2(instruction: Instruction) -> List[int]:
+    if len(instruction) != 1:
+        sys.stderr.write("Too many arguments: {}\n".format(" ".join(instruction)))
+        sys.exit(1)
+
+    instruction_bytes = [0, 0]
+    instruction_bytes[0] |= _CLASS2_PREFIX
+    instruction_bytes[0] |= (_CLASS2_INSTRUCTIONS.index(instruction[0]) << 2)
+    return instruction_bytes
+
+
+def _process_calc_or_cond(instruction: Instruction) -> List[int]:
+    if len(instruction) > 2:
+        sys.stderr.write("Too many arguments: {}\n".format(" ".join(instruction)))
+        sys.exit(1)
+    if len(instruction) < 2:
+        sys.stderr.write("Too few arguments: {}\n".format(" ".join(instruction)))
+        sys.exit(1)
+    instruction_bytes = [0, 0]
+    if instruction[0] in _COND_INSTRUCTIONS:
+        instruction_bytes[0] |= _COND_MASK
+        instruction_bytes[0] |= (_COND_INSTRUCTIONS.index(instruction[0]) << 1)
+    else:
+        instruction_bytes[0] |= _CALC_MASK
+        instruction_bytes[0] |= (_CALC_INSTRUCTIONS.index(instruction[0]) << 1)
+
+    if instruction[1].isdigit():
+        instruction_bytes[0] |= _CLASS3_PREFIX
+        constant = int(instruction[1])
+        if constant > 255:
+            sys.stderr.write("{} is too large a constant.".format(constant))
+            sys.exit(1)
+        instruction_bytes[1] = constant
+    elif instruction[1] in _REGISTERS:
+        instruction_bytes[0] |= _CLASS4_PREFIX
+        instruction_bytes[1] |= _REGISTERS.index(instruction[1])
+    else:
+        sys.stderr.write("Unkown argument {}\n".format(instruction[1]))
+        sys.exit(1)
+
+    return instruction_bytes
+
+
+def _assemble(assembly: str) -> bytes:
+    # TODO: Plumb line and column info through.
+    byte_stream = []
+    # Tokenize.
+    all_tokens = []
+    for line in assembly.split("\n"):
+        line = line.split(";")[0]
+        tokens = line.split()
+        if tokens:
+            all_tokens.append(tokens)
+
+    # Get effective addresses of labels.
+    # TODO: Don't let people use reserved words as labels.
+    addressed_instructions = []
+    labels = {}
+    address = 0
+    for token_line in all_tokens:
+        if token_line[0].endswith(":"):
+            labels[token_line[0][:-1]] = address
+            token_line = token_line[1:]
+        if not token_line:
+            continue
+        addressed_instructions.append(token_line)
+        address += 1
+
+    # Replace labels with instruction addresses
+    for token_line in addressed_instructions:
+        for i, token in enumerate(token_line):
+            if token in labels:
+                token_line[i] = str(labels[token])
+            else:
+                token_line[i] = token.upper().replace(",", "")
+
+    for instruction in addressed_instructions:
+        assert len(instruction) > 0
+        if instruction[0] == "MOV":
+            byte_stream += _process_mov(instruction)
+        elif instruction[0] in _CLASS2_INSTRUCTIONS:
+            byte_stream += _process_class2(instruction)
+        elif instruction[0] in _COND_INSTRUCTIONS or instruction[0] in _CALC_INSTRUCTIONS:
+            byte_stream += _process_calc_or_cond(instruction)
+        else:
+            sys.stderr.write("Unknown instruction {}\n".format(" ".join(instruction)))
+            sys.exit(1)
+
+    return b"".join(byte.to_bytes(1, "little") for byte in byte_stream)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) == 2:
+        with open(sys.argv[1], "r") as f:
+            sys.stdout.buffer.write(_assemble(f.read()))
+            sys.stdout.flush()
+    else:
+        sys.stderr.write(f"USAGE: {sys.argv[0]} FILE\n")
+        sys.exit(1)
