@@ -4,6 +4,8 @@
 #include <iostream>
 #include <memory>
 
+#include "rapidcheck.h"
+
 const vluint64_t end_time = 256;
 vluint64_t main_time = 0;
 
@@ -14,15 +16,18 @@ double sc_time_stamp() {
 int main(int argc, char** argv, char** env) {
     Verilated::commandArgs(argc, argv);
     auto byte_adder = new Vbyte_adder;
-    byte_adder->x = 23;
-    byte_adder->y = 24;
-    int output = byte_adder->z;
-    while (!Verilated::gotFinish() && main_time < end_time) {
-        byte_adder->eval();
-        main_time++;
-        output = byte_adder->z;
-    }
-    std::cout << "Output: " << output << std::endl;
+
+    rc::check("adder adds numbers",
+            [byte_adder](unsigned char x, unsigned char y) {
+                RC_PRE(x + y <= 255);
+                byte_adder->x = x;
+                byte_adder->y = y;
+                for (int i = 0; i < end_time; ++i) {
+                    byte_adder->eval();
+                    main_time++;
+                }
+                RC_ASSERT(byte_adder->z == x + y);
+            });
 
     delete byte_adder;
     return 0;
