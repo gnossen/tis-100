@@ -18,8 +18,9 @@ int main(int argc, char** argv, char** env) {
     auto byte_adder = new Vbyte_adder;
 
     rc::check("adder adds numbers",
-            [byte_adder](unsigned char x, unsigned char y) {
-                RC_PRE(x + y <= 255);
+            [byte_adder]() {
+                const auto x = *rc::gen::inRange(0, 255);
+                const auto y = *rc::gen::inRange(0, 255 - x);
                 byte_adder->x = x;
                 byte_adder->y = y;
                 for (int i = 0; i < end_time; ++i) {
