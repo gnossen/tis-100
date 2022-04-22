@@ -1,0 +1,150 @@
+#!/usr/bin/env python
+
+import sys
+
+_CLASS_MASK = 0b11100000
+
+_CLASS0_DST_MASK = 0b00011100
+
+_INSTRUCTION_WIDTH = 2
+
+_ACC = 0
+_NIL = 1
+_LEFT = 2
+_RIGHT = 3
+_UP = 4
+_DOWN = 5
+_ANY = 6
+_LAST = 7
+
+# TODO: Add mode to dump state at each instruction.
+# TODO: Print out currently decoded instruction as assembly.
+
+def get_instruction_class(instruction):
+    return (instruction[0] & _CLASS_MASK) >> 5
+
+def get_fixed_int(byte, offset, width):
+    mask = 0
+    one_bit_mask = 1
+    for i in range(width):
+        if i >= offset:
+            mask |= one_bit_mask
+        one_bit_mask <<= 1
+    shifted_int = byte & mask
+    return shifted_int >> offset
+
+def parse_class0(instruction):
+    dst_reg = get_fixed_int(instruction[0], 2, 3)
+    src_reg = get_fixed_int(instruction[1], 0, 3)
+    return dst_reg, src_reg
+
+class Tis100:
+    def __init__(self, bytecode):
+        self.ic = 0
+        self.acc = 0
+        self.bak = 0
+        self.last = _NIL
+        self.read_buffer = None
+        self.bytecode = bytecode
+
+    def increment_counter(self):
+        # TODO: Consider what to do when  (bytecode % 2) != 0
+        self.ic = (self.ic + _INSTRUCTION_WIDTH) % len(self.bytecode)
+
+    def get_instruction(self):
+        return bytecode[ic:ic+2]
+
+
+    # Returns an int if a value is read. None otherwise.
+    # If None is returned, the CPU must block and not increment the
+    # instruction counter.
+    def read(self, src_reg):
+        if src_reg == _ACC:
+            return self.acc
+        elif src_reg == _NIL:
+            return 0
+        # TODO: Implement directions + any
+        elif src_reg == _LAST:
+            return self.read(self.last)
+        else:
+            # TODO: Convert this into a panic?
+            raise AssertionError(f"Unknown source register {src_reg}")
+
+
+    # Returns true if value is read. False otherwise.
+    # If False is returned, the CPU must block and not increment the
+    # instruction counter.
+    def write(self, dst_reg, value):
+        if dst_reg == _ACC:
+            self.acc = value
+            return True
+        elif dst_reg == _NIL:
+            return True
+        # TODO: Implement directions + any
+        elif src_reg == _LAST:
+            return self.write(self.last, value)
+        else:
+            # TODO: Convert this into a panic?
+            raise AssertionError(f"Unknown destination register {dst_reg}")
+
+    # Returns true if value is read. False otherwise.
+    # If False is returned, the CPU must block and not increment the
+    # instruction counter.
+    def commit_write(self, dst_reg):
+        if self.write(dst_reg, self.read_buffer):
+            self.read_buffer = None
+            return True
+        else:
+            return False
+
+    # Returns True if successful. Returns False if blocked.
+    def move_reg_reg(self, dst_reg, src_reg):
+        # TODO: Something like asyncio would really help here.
+        if self.read_buffer is None:
+            # The read operation has not already finished.
+            if (val := self.read(src_reg)) is not None:
+                self.read_buffer = val
+                return self.commit_write(dst_reg)
+            else:
+                # Block by forcing reprocessing of instruction on next cycle.
+                return False
+        else:
+            # The read operation has already finished, but we blocked while writing.
+            return self.commit_write(dst_reg)
+
+    def run_cycle(self):
+        if len(self.bytecode) < 2:
+            pass
+        instruction = self.get_instruction()
+        instruction_class = get_instruction_class(intruction)
+        if instruction_class == 0:
+            dst_reg, src_reg = parse_class0(instruction)
+            if not self.move_reg_reg(dst_reg, src_reg):
+                return
+        else
+            # TODO: Figure out what the behavior should be here?
+            raise AssertionError(f"Unknown instruction class {instruction_class}.")
+        increment_counter()
+
+def _emulate(bytecode):
+    # TODO: Maybe pull out a class for this?
+    state = Tis100(bytecode)
+
+    while True:
+       state.run_cycle()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.stderr.write(f"USAGE: {sys.argv[0]} OBJFILE\n")
+        sys.exit(1)
+
+    objfile = sys.argv[1]
+    bytecode = None
+    with open(objfile, "rb") as f:
+        bytecode = f.read()
+
+    try:
+        _emulate(bytecode)
+    except KeyboardInterrupt:
+        pass
